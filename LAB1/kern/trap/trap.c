@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <console.h>
 #include <kdebug.h>
-#include <string.h>
+
 #define TICK_NUM 100
 
 static void print_ticks() {
@@ -18,6 +18,33 @@ static void print_ticks() {
     panic("EOT: kernel seems ok.");
 #endif
 }
+
+// for challenge 
+static void
+lab1_switch_to_user(void) {
+    //LAB1 CHALLENGE 1 : TODO
+    // make space for user stack 
+	asm volatile (
+	    "pushl %%ss \n"
+        "pushl %%esp \n"
+	    "int %0 \n"
+	    "movl %%ebp, %%esp"
+	    : 
+	    : "i"(T_SWITCH_TOU)
+	);
+}
+
+static void
+lab1_switch_to_kernel(void) {
+    //LAB1 CHALLENGE 1 :  TODO
+    asm volatile (
+        "int %0 \n"
+	    "movl %%ebp, %%esp \n"
+	    : 
+	    : "i"(T_SWITCH_TOK)
+	);
+}
+
 
 /* *
  * Interrupt descriptor table:
@@ -48,17 +75,18 @@ idt_init(void) {
       */
     extern uintptr_t __vectors[];
     int i;
-    for (i = 0; i < sizeof(idt) / sizeof(struct gatedesc); i ++) {
+    for(i = 0;i < 256; i++){
+        // SETGATE(idt[i], 0, 8, __vectors[i], 0);
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
-	// syscall trap, user mode
+    // syscall trap, user mode
     SETGATE(idt[T_SYSCALL], 1, GD_KTEXT, __vectors[T_SYSCALL], DPL_USER);
 
     //challenge 1
     SETGATE(idt[T_SWITCH_TOK], 0, GD_KTEXT, __vectors[T_SWITCH_TOK], DPL_USER);
-    
-    // load the IDT
+
     lidt(&idt_pd);
+
 }
 
 static const char *
@@ -147,44 +175,6 @@ print_regs(struct pushregs *regs) {
     cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
-/* temporary trapframe or pointer to trapframe */
-struct trapframe switchk2u, *switchu2k;
-
-static inline __attribute__((always_inline)) void switch_to_user(struct trapframe *tf) {
-    if (tf->tf_cs != USER_CS) {
-        // tf->tf_cs = USER_CS;
-        // tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-        // tf->tf_eflags |= FL_IOPL_MASK;
-        // tf->tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8
-        
-        switchk2u = *tf;
-
-        switchk2u.tf_cs = USER_CS;
-        switchk2u.tf_ds = switchk2u.tf_es = switchk2u.tf_ss = USER_DS;
-        switchk2u.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
-    
-        // set eflags, make sure ucore can use io under user mode.
-        // if CPL > IOPL, then cpu will generate a general protection.
-        switchk2u.tf_eflags |= FL_IOPL_MASK;
-    
-        // set temporary stack
-        // then iret will jump to the right stack
-        *((uint32_t *)tf - 1) = (uint32_t)&switchk2u;
-    }
-}
-
-static inline __attribute__((always_inline)) void switch_to_kernel(struct trapframe *tf) {
-    if (tf->tf_cs != KERNEL_CS) {
-        tf->tf_cs = KERNEL_CS;
-        tf->tf_ds = tf->tf_es = KERNEL_DS;
-        tf->tf_eflags &= ~FL_IOPL_MASK;
-        switchu2k = (struct trapframe *)(tf->tf_esp - (sizeof(struct trapframe) - 8));
-
-        memmove(switchu2k, tf, sizeof(struct trapframe) - 8);
-        *((uint32_t *)tf - 1) = (uint32_t)switchu2k;
-    }
-}
-
 /* trap_dispatch - dispatch based on what type of trap occurred */
 static void
 trap_dispatch(struct trapframe *tf) {
@@ -198,9 +188,10 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-        ticks ++;
-        if (ticks % TICK_NUM == 0) {
+        ticks++;
+        if(ticks % 100 == 0){
             print_ticks();
+            // cprintf("curr ticks is:%d\n", ticks);
         }
         break;
     case IRQ_OFFSET + IRQ_COM1:
@@ -210,20 +201,28 @@ trap_dispatch(struct trapframe *tf) {
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
-	if(c == '0'){
-	    switch_to_kernel(tf);
-	    print_trapframe(tf);
-	} else if(c == '3'){
-	    switch_to_user(tf);
-	    print_trapframe(tf);
-	}
+        if(c == '0'){
+            lab1_switch_to_kernel();
+            print_trapframe(tf);
+        } else if(c == '3'){
+            lab1_switch_to_user();
+            print_trapframe(tf);
+        }
         break;
-    //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
+    // LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
-        switch_to_user(tf);
+        if (tf->tf_cs != USER_CS) {
+            tf->tf_cs = USER_CS;
+            tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+            tf->tf_eflags |= FL_IOPL_MASK;
+        }
         break;
     case T_SWITCH_TOK:
-        switch_to_kernel(tf);
+        if (tf->tf_cs != KERNEL_CS) {
+            tf->tf_cs = KERNEL_CS;
+            tf->tf_ds = tf->tf_es = KERNEL_DS;
+            tf->tf_eflags &= ~FL_IOPL_MASK;
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
