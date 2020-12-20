@@ -28,6 +28,9 @@ main(void) {
     assert(waitpid(pid, &code) != 0 && wait() != 0);
     cprintf("waitpid %d ok.\n", pid);
 
+    int a[3] = {0,1,2};
+    int p = a[100];
+
     cprintf("exit pass.\n");
     return 0;
 }
