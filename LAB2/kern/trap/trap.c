@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <console.h>
-#include <vmm.h>
-#include <swap.h>
 #include <kdebug.h>
 
 #define TICK_NUM 100
@@ -30,16 +28,17 @@ static void print_ticks() {
 static struct gatedesc idt[256] = {{0}};
 
 static struct pseudodesc idt_pd = {
-    sizeof(idt) - 1, (uintptr_t)idt
+    sizeof(idt) - 1,(uintptr_t)idt
 };
 
 /* idt_init - initialize IDT to each of the entry points in kern/trap/vectors.S */
-void
-idt_init(void) {
-     /* LAB1 YOUR CODE : STEP 2 */
-     /* (1) Where are the entry addrs of each Interrupt Service Routine (ISR)?
+void 
+idt_init(void)
+{
+    /* LAB1 YOUR CODE : STEP 2 */
+    /* (1) Where are the entry addrs of each Interrupt Service Routine (ISR)?
       *     All ISR's entry addrs are stored in __vectors. where is uintptr_t __vectors[] ?
-      *     __vectors[] is in kern/trap/vector.S which is produced by tools/vector.c
+      *     __vectors[] is in kern/trapvector.S which is produced by toolsector.c
       *     (try "make" command in lab1, then you will find vector.S in kern/trap DIR)
       *     You can use  "extern uintptr_t __vectors[];" to define this extern variable which will be used later.
       * (2) Now you should setup the entries of ISR in Interrupt Description Table (IDT).
@@ -50,14 +49,18 @@ idt_init(void) {
       */
     extern uintptr_t __vectors[];
     int i;
-    for(i = 0;i < 256; i++){
+    for (i = 0; i < 256; i++)
+    {
         // SETGATE(idt[i], 0, 8, __vectors[i], 0);
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
     // syscall trap, user mode
     SETGATE(idt[T_SYSCALL], 1, GD_KTEXT, __vectors[T_SYSCALL], DPL_USER);
+
+    //challenge 1
+    SETGATE(idt[T_SWITCH_TOK], 0, GD_KTEXT, __vectors[T_SWITCH_TOK], DPL_USER);
+
     lidt(&idt_pd);
-   
 }
 
 static const char *
@@ -172,6 +175,7 @@ pgfault_handler(struct trapframe *tf) {
 static volatile int in_swap_tick_event = 0;
 extern struct mm_struct *check_mm_struct;
 
+/* trap_dispatch - dispatch based on what type of trap occurred */
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -192,12 +196,11 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-        ticks++;
-        if(ticks % 100 == 0){
-            print_ticks();
-            // cprintf("curr ticks is:%d\n", ticks);
-        }
-        break;      
+	ticks++;
+	if (ticks % TICK_NUM == 0){
+		print_ticks();
+	}
+        break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
         cprintf("serial [%03d] %c\n", c, c);

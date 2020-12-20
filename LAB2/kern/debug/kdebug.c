@@ -3,10 +3,7 @@
 #include <stab.h>
 #include <stdio.h>
 #include <string.h>
-#include <sync.h>
 #include <kdebug.h>
-#include <kmonitor.h>
-#include <assert.h>
 
 #define STACKFRAME_DEPTH 20
 
@@ -310,17 +307,16 @@ print_stackframe(void) {
      // 注意取得EBP EIP值的顺序问题
     uint32_t curr_ebp = read_ebp();
     uint32_t curr_eip = read_eip();
-
     int i;
-    for(i=0; i<STACKFRAME_DEPTH && curr_ebp; i++){
+    for (i = 0; i < STACKFRAME_DEPTH && curr_ebp; i++)
+    {
         cprintf("ebp:%08x eip:%08x args:", curr_ebp, curr_eip);
-        uint32_t* args = (uint32_t*)curr_ebp +2;
+         uint32_t *args = (uint32_t *)curr_ebp + 2;
         cprintf("%08x %08x %08x %08x\n", args[0], args[1], args[2], args[3]);
-        print_debuginfo(curr_eip-1);
-        
-        curr_eip = *((uint32_t*)curr_ebp+1);
-        curr_ebp = *((uint32_t*)curr_ebp);
+        print_debuginfo(curr_eip - 1);
+
+         curr_eip = *((uint32_t *)curr_ebp + 1);
+         curr_ebp = *((uint32_t *)curr_ebp);
     }
-}
 }
 
