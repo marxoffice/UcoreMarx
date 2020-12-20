@@ -172,9 +172,6 @@ pgfault_handler(struct trapframe *tf) {
     panic("unhandled page fault.\n");
 }
 
-static volatile int in_swap_tick_event = 0;
-extern struct mm_struct *check_mm_struct;
-
 /* trap_dispatch - dispatch based on what type of trap occurred */
 static void
 trap_dispatch(struct trapframe *tf) {
