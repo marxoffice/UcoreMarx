@@ -638,11 +638,12 @@ load_icode(unsigned char *binary, size_t size) {
      *          tf_eip should be the entry point of this binary program (elf->e_entry)
      *          tf_eflags should be set to enable computer to produce Interrupt
      */
+    // 由于这些都是用户状态的,所以需要修改为用户段数据
     tf->tf_cs = USER_CS;
     tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-    tf->tf_esp = USTACKTOP;
-    tf->tf_eip = elf->e_entry;
-    tf->tf_eflags = FL_IF;
+    tf->tf_esp = USTACKTOP;          // esp指向用户栈的栈顶
+    tf->tf_eip = elf->e_entry;       // eip指向ELF可执行文件加载后的入口entry
+    tf->tf_eflags = FL_IF;           // 开中断使能 注意
     ret = 0;
 out:
     return ret;
